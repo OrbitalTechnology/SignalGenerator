@@ -4,6 +4,7 @@
 #include <string.h>
 #include <math.h>
 #include <stdint.h>
+#include <vector>
 
 #include "ao/ao.h"
 
@@ -13,8 +14,4 @@ ao_device *device = 0;
 ao_sample_format format;
 int driver = 0;
 
-int16_t* buffer = 0;
-int buf_size = 0;
-
-int16_t* bufferStop = 0;
-int buf_size_stop = 0;
+std::vector<int16_t> newBuffer;

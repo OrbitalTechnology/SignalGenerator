@@ -1,42 +1,49 @@
 #include "siggen.hpp"
 
-//std::string sentence = "$$MIKEL-3,1469352038,Flight7,02:19:59,37.3466186523,-121.946205139,32.0,0.0,3.95110321045,0.106474421918,0.420691430569,0.804084181786,0.0,0.0,24.1094760895,100874.882812,32.3646697998,1.39783334732,43*ED19";
-//std::string sentence = "$$EAD-PLS-001";
+std::string input = "$$EAD-PLS-00,123,12:00:00,53.194,-2.902,1000";
 
-char message[] = {"\0\0\0\0\0"};
-
-float frequencies[] = {1500.0, 2000.0};
-float freqL = 1500.0f;
-float freqH = 2000.0f;
+float freqOffset = 1500.0f;
+float freqShift = 425.0f;
 
 float freq[] = {
-	freqL * M_PI * 2.0f,
-	freqH * M_PI * 2.0f
+	freqOffset * M_PI * 2.0f,
+	(freqOffset + freqShift) * M_PI * 2.0f
 };
 
 float phase = 0.0f;
-int amplitude = 32768;
+float amplitude = 1.0f;
 
-int newFunction(int16_t* buffer, int index, int samplesPerBit, int bit) {
+// RTTY Info
+int len = 0;	
+int loopCount = 10;
+int startBitCount = 1;
+int stopBitCount = 2;
+int asciiMode = 8;
+int baudRate = 300;
+
+float milliSecondsSymbol = (1000.0f / baudRate);
+// End RTTY Info
+
+int pushBit(std::vector<int16_t>* buffer, int index, int samplesPerBit, int bit) {
+	
 	float delta = freq[bit] / 44100; 
 
 	for (unsigned int s = 0; s < samplesPerBit; s++) {
-		buffer[index] = cos(phase) * amplitude;
+		buffer->push_back(cos(phase) * (32768 * amplitude));
 		phase += delta;
 		index++;
 	}
 
+	while(phase > M_PI * 2) phase -= M_PI * 2;
+
 	return index;
 }
 
-
-int main(int argc, char* argv[]) {
-
-	std::cout << "libao example program" << std::endl;
-
+int init() {
 	ao_initialize();
 	driver = ao_default_driver_id();
-
+	std::cout << "Default Driver: " << driver << std::endl;
+	
 	memset(&format, 0, sizeof(format));
 	format.bits = 16;
 	format.channels = 1;
@@ -50,52 +57,111 @@ int main(int argc, char* argv[]) {
 		return -1;
 	}
 
-	// RTTY Info
-	int len = 5;//sentence.size();
-	std::cout << "Byte Count: " << len << std::endl;
-	
-	int startBitCount = 1;
-	int endBitCount = 2;
-	int asciiMode = 8;
-	int baudRate = 50;
+	return 0;
+}
 
-	int symbolCount = (len * asciiMode) + (len * startBitCount) + (len * endBitCount);
-	std::cout << "Symbol Count: " << symbolCount << std::endl;
+uint16_t crc_xmodem_update (uint16_t crc, uint8_t data) {
+	int i;
 
-	float milliSecondsSymbol = (1.0f / (baudRate / 1000.0f));
-	std::cout << "ms/symbol: " << milliSecondsSymbol << std::endl;
+	crc = crc ^ ((uint16_t)data << 8);
+	for (i=0; i<8; i++)
+	{
+		if (crc & 0x8000)
+			crc = (crc << 1) ^ 0x1021;
+		else
+			crc <<= 1;
+	}
+	 
+	return crc;
+}
 
-	float sentenceLengthMilliseconds = milliSecondsSymbol * symbolCount;
-	std::cout << "Total Sentence Length: " << sentenceLengthMilliseconds / 1000 << std::endl;
+std::string checksum(const std::string input) {
+	size_t i;
+	uint16_t crc;
+	uint8_t c;
+ 
+	crc = 0xFFFF;
+ 
+	// Calculate checksum ignoring the first two $s
+	for (i = 2; i < input.size(); i++)
+	{
+		c = input[i];
+		crc = crc_xmodem_update(crc, c);
+	}
+ 	
+ 	char buf[6];
+	sprintf (buf, "%u", crc);
 
-	int bufferSize = sentenceLengthMilliseconds * format.rate;
-	// End RTTY Info
+	char chcksum[10];
+	memset(chcksum, '\0', sizeof(chcksum));
 
-	buf_size = format.bits / 8 * format.channels * (format.rate * (sentenceLengthMilliseconds / 1000));
-	buffer = (int16_t*) calloc(buf_size, sizeof(int16_t));
+	snprintf(chcksum, sizeof(chcksum), "*%04X\n", crc);
 
-	int samplesPerBit = (format.rate / 1000) * milliSecondsSymbol;
+	return std::string(chcksum, sizeof(chcksum));
+}
+
+void generate() {
+	std::string hash = checksum(input);
+	std::string sentence = input + hash;
+	std::cout << sentence << std::endl;
+
+	len = sentence.size();
+
 	int index = 0;
+	int startBitPreambleCount = 20;
+	int samplesPerBit = (format.rate / 1000) * milliSecondsSymbol;
 
+	// Preamble
+	for(unsigned int s = 0; s < startBitPreambleCount; s++) {
+		index = pushBit(&newBuffer, index, samplesPerBit, 1);
+	}
+
+	index = 0;
 	for(unsigned int c = 0; c < len; c++) {
-		char ch = message[c];
+		char ch = sentence[c];
 
-		index = newFunction(buffer, index, samplesPerBit, 0);
-		for (unsigned int b = 0; b < asciiMode; b++) {
-			int bit = (c >> b) & 0x01;
-
-			index = newFunction(buffer, index, samplesPerBit, bit);
+		// Start Bit
+		for(unsigned int b = 0; b < startBitCount; b++) {
+			index = pushBit(&newBuffer, index, samplesPerBit, 0);	
 		}
-		index = newFunction(buffer, index, samplesPerBit, 1);
-		index = newFunction(buffer, index, samplesPerBit, 2);
+
+		// Character Bit
+		for (unsigned int b = 0; b < asciiMode; b++) {
+			int bit = (ch >> b) & 0x01;
+			index = pushBit(&newBuffer, index, samplesPerBit, bit);
+		}
+		
+		// Stop Bit
+		for(unsigned int b = 0; b < stopBitCount; b++) {
+			index = pushBit(&newBuffer, index, samplesPerBit, 1);	
+		}
+	}	
+}
+
+void play() {
+	// Play Buffer n Times
+	for(unsigned int l = 0; l < loopCount; l++) {	
+		ao_play(device, (char*) &newBuffer[0], newBuffer.size() * sizeof(int16_t));
+	}
+}
+
+int main(int argc, char* argv[]) {
+	if(init() < 0) {
+		return -1;
 	}
 
-	while (true) {
-		ao_play(device, (char*)buffer, buf_size);
+	int count = 0;
+	ao_info** info = ao_driver_info_list(&count);
+
+	for(unsigned d = 0; d < count; d++ ) {
+		ao_info* driver = info[d];
+		std::cout << d << ": [" << driver->type << "] - " << driver->short_name << std::endl;
 	}
-	
+
+	generate();
+	play();
+
 	ao_close(device);
 	ao_shutdown();
-
 	return 0;
 }
