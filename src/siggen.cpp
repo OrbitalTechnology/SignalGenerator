@@ -15,11 +15,11 @@ float amplitude = 1.0f;
 
 // RTTY Info
 int len = 0;	
-int loopCount = 10;
+int loopCount = 50;
 int startBitCount = 1;
 int stopBitCount = 2;
 int asciiMode = 8;
-int baudRate = 300;
+int baudRate = 50;
 
 float milliSecondsSymbol = (1000.0f / baudRate);
 // End RTTY Info
@@ -145,7 +145,22 @@ void play() {
 	}
 }
 
+void help() {
+	std::cout << "Orbital Technologies RTTY Signal Generator" << std::endl;
+	std::cout << "\t--message \"sentence\": Message to transmit" << std::endl;
+	std::cout << "\t[--list] : List Audio Output Devices" << std::endl;
+	std::cout << "\t[--baud n]: Set Baud Rate" << std::endl;
+	std::cout << "\t[--stop n]: Stop Bits" << std::endl;
+	std::cout << "\t[--start n]: Start Bits" << std::endl;
+	std::cout << "\t[--loop n]: Loop Signal n times" << std::endl;
+}
+
 int main(int argc, char* argv[]) {
+	// if (argc == 1) {
+	// 	help();
+	// 	return 0;
+	// }
+
 	if(init() < 0) {
 		return -1;
 	}
