@@ -1,6 +1,7 @@
 #include "siggen.hpp"
 
-std::string input = "$$EAD-PLS-00,123,12:00:00,53.194,-2.902,1000";
+//std::string input = "$$EAD-PLS-00,123,12:00:00,53.194,-2.902,1000";
+std::string input = "$$TEST";
 
 float freqOffset = 1500.0f;
 float freqShift = 425.0f;
@@ -15,7 +16,7 @@ float amplitude = 1.0f;
 
 // RTTY Info
 int len = 0;	
-int loopCount = 50;
+int loopCount = 1;
 int startBitCount = 1;
 int stopBitCount = 2;
 int asciiMode = 8;
