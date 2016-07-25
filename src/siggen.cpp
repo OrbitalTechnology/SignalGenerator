@@ -4,7 +4,7 @@
 std::string input = "$$TEST";
 
 float freqOffset = 1500.0f;
-float freqShift = 425.0f;
+float freqShift = 1000.0f;
 
 float freq[] = {
 	freqOffset * M_PI * 2.0f,
