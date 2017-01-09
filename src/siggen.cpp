@@ -43,7 +43,10 @@ int pushBit(std::vector<int16_t>* buffer, int index, int samplesPerBit, int bit)
 int init() {
 	ao_initialize();
 	driver = ao_default_driver_id();
+	fileDriver = ao_driver_id("wav");
+
 	std::cout << "Default Driver: " << driver << std::endl;
+	std::cout << "File Driver: " << fileDriver << std::endl;
 	
 	memset(&format, 0, sizeof(format));
 	format.bits = 16;
@@ -52,8 +55,9 @@ int init() {
 	format.byte_format = AO_FMT_LITTLE;
 
 	device = ao_open_live(driver, &format, NULL);
+	fileDevice = ao_open_file(fileDriver, "output.wav", 1, &format, NULL);
 
-	if (device == NULL) {
+	if (device == NULL || fileDevice == NULL) {
 		std::cerr << "Error Opening Device" << std::endl;
 		return -1;
 	}
@@ -143,6 +147,7 @@ void play() {
 	// Play Buffer n Times
 	for(unsigned int l = 0; l < loopCount; l++) {	
 		ao_play(device, (char*) &newBuffer[0], newBuffer.size() * sizeof(int16_t));
+		ao_play(fileDevice, (char*) &newBuffer[0], newBuffer.size() * sizeof(int16_t));
 	}
 }
 
